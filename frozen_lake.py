@@ -24,39 +24,42 @@ from keras.utils.np_utils import to_categorical
 
 # s,a,r,s'
 # a are ints from 0 to
-# TODO make Q output an array of rewards for each action
+# TODO set label of terminal state to just `r` instead of estimate of Q
+# TODO make function to get labels for minibatch
+# TODO target network
 
 env = gym.make('FrozenLake-v0')
 
 S = env.observation_space.n
 A = env.action_space.n
 
-# Use deque because it's easy to remove the leading elements to expire them.
+# Use `deque` because it's efficient to remove the leading elements to expire them.
 buffer = deque()
 batch_size = 64
 epsilon = 0.90
 gamma = 0.99
-ITERS = 10
+ITERS = 1000
 
 sess = tf.InteractiveSession()
 
 
 def create_q():
     state = Input(shape=(S, ))
-
-    # action = Input(shape=A)
+    # action = Input(shape=(A, ))
     #
     # x = concatenate([state, action])
     x = state
 
-    x = Dense(64, activation='relu')(x)
+    x = Dense(16, activation='relu')(x)
     x = BatchNormalization()(x)
-    x = Dense(64, activation='relu')(x)
+    x = Dense(16, activation='relu')(x)
     x = BatchNormalization()(x)
 
     rewards = Dense(A)(x)
+    # rewards = Dense(1)(x)
 
     model = Model(inputs=state, outputs=rewards)
+    # model = Model(inputs=[state, action], outputs=rewards)
 
     model.compile(
         optimizer=Adam(),
@@ -67,22 +70,8 @@ def create_q():
     return model
 
 
-def T(x) -> tf.Tensor:
-    if isinstance(x, np.ndarray):
-        tensor = tf.convert_to_tensor(x, dtype=tf.float32)
-    elif isinstance(x, tf.Tensor):
-        tensor = x
-    elif isinstance(x, list):
-        tensor = tf.convert_to_tensor(x, dtype=tf.float32)
-    elif isinstance(x, (np.int64, np.int32, np.int)):
-        return tf.convert_to_tensor(to_categorical(x, num_classes=S).astype(np.float32))
-    else:
-        print(type(x), x)
-    return tensor
-
-
-def eps_greedy(s: tf.Tensor, epsilon=epsilon):
-    return np.argmax(Q(s)) if random.random() > epsilon else env.action_space.sample()
+def eps_greedy(s: np.ndarray, epsilon=epsilon):
+    return np.argmax(Q.predict(s)) if random.random() > epsilon else env.action_space.sample()
 
 
 if __name__ == '__main__':
@@ -90,6 +79,7 @@ if __name__ == '__main__':
     # initial sampling
     for i in range(ITERS):
         done = False
+        # decay exploration over time
         if i % (ITERS // 10) == 0 and i > 0:
             epsilon *= .95
 
@@ -97,7 +87,7 @@ if __name__ == '__main__':
 
         # random sampling to just get some training data
         while not done:
-            a = eps_greedy(T(s))
+            a = eps_greedy(to_categorical(s, num_classes=S))
             s_, r, done, _ = env.step(a)
             # TODO encode buffer without one hot encoding everything
             # buffer.append(([to_categorical(s), to_categorical(a), np.array(r), to_categorical(s)]))
@@ -112,28 +102,15 @@ if __name__ == '__main__':
     states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
     succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
     actions = data[:, 1].astype(np.int)
+    # actions = to_categorical(data[:, 1]).astype(np.float32)
+    rewards = data[:, 2].astype(np.float32)
 
-    rewards = data[:, 2]
-    # TODO is this masking correct? the reduce sum seems to be a cheap hack for fancy indexing
-    action_mask = T(to_categorical(actions, num_classes=A))
-    td_estimate = rewards + gamma * tf.reduce_sum(action_mask * Q(T(succ_states)), axis=1)
+    # td_estimate = rewards + gamma * Q.predict(succ_states, actions)
+    td_estimates = Q.predict(states)
 
-    loss = tf.reduce_mean(keras.losses.mean_squared_error(tf.reduce_max(Q(T(states))), td_estimate))
+    for i, (s, a, r, s_) in enumerate(zip(states, actions, rewards, succ_states)):
+        # `Q.predict` returns a (1,A) array
+        td_estimates[i][a] += r + gamma * Q.predict(s_[None, :])[0][a]
 
-    train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
-
-# TODO use Q.predict and drop the tensors, and use fancy indexing from numpy
-
-    # td_estimate = rewards + gamma * tf.reduce_sum(action_mask * Q(T(succ_states)), axis=1)
-
-    # Q.fit(states, td_estimate)
-    # Q.fit(T(states), td_estimate)
-    init = tf.global_variables_initializer()
-    sess.run(init)
-    for _ in range(100):
-        train_step.run()
-# TODO set label of terminal state to just `r` instead of estimate of Q
-
-# TODO make function to get labels for minibatch
-# TODO target network
-# TODO add sess.close or `with tf.session as sess`
+    # td_estimate = rewards + gamma * Q.predict(succ_states, actions)
+    Q.fit(states, td_estimates)
