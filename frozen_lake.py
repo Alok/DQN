@@ -8,25 +8,26 @@ import sys
 from collections import deque
 
 import gym
-import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from keras import backend as K
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.layers import (Activation, BatchNormalization, Dense, Dropout,
-                          Input, concatenate)
-from keras.models import Model, Sequential
-from keras.optimizers import Adam
 from keras.utils.np_utils import to_categorical
 
-# start with DQN, then Double DQN
+from model import create_q
+
+# TODO  Double DQN
+# TODO  replay buffer
+# TODO  sample minibatches
+# TODO  importance sample minibatches
+# TODO  dueling dqn
+# TODO  expire buffer
 
 # s,a,r,s'
 # a are ints from 0 to
 # TODO set label of terminal state to just `r` instead of estimate of Q
 # TODO make function to get labels for minibatch
 # TODO target network
+# TODO sample buffer in less naive way (currently just wait till it's full and train
 
 env = gym.make('FrozenLake-v0')
 
