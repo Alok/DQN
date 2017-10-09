@@ -75,8 +75,7 @@ def T(x) -> tf.Tensor:
     elif isinstance(x, list):
         tensor = tf.convert_to_tensor(x, dtype=tf.float32)
     elif isinstance(x, (np.int64, np.int32, np.int)):
-        return tf.convert_to_tensor(to_categorical(x, num_classes=S))
-
+        return tf.convert_to_tensor(to_categorical(x, num_classes=S).astype(np.float32))
     else:
         print(type(x), x)
     return tensor
@@ -100,14 +99,33 @@ if __name__ == '__main__':
         while not done:
             a = eps_greedy(T(s))
             s_, r, done, _ = env.step(a)
-            buffer.append(np.array([s, a, r, s_]))
+            # TODO encode buffer without one hot encoding everything
+            # buffer.append(([to_categorical(s), to_categorical(a), np.array(r), to_categorical(s)]))
+            buffer.append([s, a, r, s_])
             s = s_
 
-    train = np.random.permutation(buffer).astype(np.float32)
+    # XXX can the array be shuffled as long as we store the succ state and current reward?
 
-    mb = train[:batch_size]
+    data = np.array(buffer)
 
-# TODO set label of terminal state to just r instead of estimate of Q
+    # one hot encode states
+    states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
+    succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
+    actions = data[:, 1].astype(np.int)
+
+    rewards = data[:, 2]
+    # TODO is this masking correct? the reduce sum seems to be a cheap hack for fancy indexing
+    action_mask = T(to_categorical(actions, num_classes=A))
+    td_estimate = rewards + gamma * tf.reduce_sum(action_mask * Q(T(succ_states)), axis=1)
+
+# TODO use Q.predict and drop the tensors, and use fancy indexing from numpy
+
+    td_estimate = rewards + gamma * tf.reduce_sum(action_mask * Q(T(succ_states)), axis=1)
+
+    Q.fit(states, td_estimate)
+
+# TODO set label of terminal state to just `r` instead of estimate of Q
 
 # TODO make function to get labels for minibatch
 # TODO target network
+# TODO add sess.close or `with tf.session as sess`
