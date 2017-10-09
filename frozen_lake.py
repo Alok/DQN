@@ -34,8 +34,11 @@ A = env.action_space.n
 # Use deque because it's easy to remove the leading elements to expire them.
 buffer = deque()
 batch_size = 64
-epsilon = 0.05
+epsilon = 0.90
 gamma = 0.99
+ITERS = 10
+
+sess = tf.InteractiveSession()
 
 
 def create_q():
@@ -86,8 +89,10 @@ def eps_greedy(s: tf.Tensor, epsilon=epsilon):
 if __name__ == '__main__':
     Q = create_q()
     # initial sampling
-    for _ in range(100):
+    for i in range(ITERS):
         done = False
+        if i % (ITERS // 10) == 0 and i > 0:
+            epsilon *= .95
 
         s = env.reset()
 
