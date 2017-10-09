@@ -36,81 +36,55 @@ A = env.action_space.n
 # Use `deque` because it's efficient to remove the leading elements to expire them.
 buffer = deque()
 batch_size = 64
-epsilon = 0.90
+epsilon = 0.99
 gamma = 0.99
-ITERS = 1000
+MAX_BUFFER_SIZE = 1_000_000
+ITERS = 100
 
 sess = tf.InteractiveSession()
 
 
-def create_q():
-    state = Input(shape=(S, ))
-    # action = Input(shape=(A, ))
-    #
-    # x = concatenate([state, action])
-    x = state
-
-    x = Dense(16, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dense(16, activation='relu')(x)
-    x = BatchNormalization()(x)
-
-    rewards = Dense(A)(x)
-    # rewards = Dense(1)(x)
-
-    model = Model(inputs=state, outputs=rewards)
-    # model = Model(inputs=[state, action], outputs=rewards)
-
-    model.compile(
-        optimizer=Adam(),
-        loss='mse',
-        metrics=['acc'],
-    )
-
-    return model
-
-
-def eps_greedy(s: np.ndarray, epsilon=epsilon):
-    return np.argmax(Q.predict(s)) if random.random() > epsilon else env.action_space.sample()
+def eps_greedy(s: np.int64, epsilon=epsilon):
+    # `np.argmax` works along flattened array, so for an nested array with a single entry, we get the right answer.
+    return np.argmax(Q.predict(to_categorical(s,S))) if random.random() > epsilon else env.action_space.sample()
 
 
 if __name__ == '__main__':
-    Q = create_q()
+    Q = create_q(S, A)
+
     # initial sampling
     for i in range(ITERS):
-        done = False
-        # decay exploration over time
-        if i % (ITERS // 10) == 0 and i > 0:
-            epsilon *= .95
 
-        s = env.reset()
+        epsilon *= .99
 
-        # random sampling to just get some training data
-        while not done:
-            a = eps_greedy(to_categorical(s, num_classes=S))
-            s_, r, done, _ = env.step(a)
-            # TODO encode buffer without one hot encoding everything
-            # buffer.append(([to_categorical(s), to_categorical(a), np.array(r), to_categorical(s)]))
-            buffer.append([s, a, r, s_])
-            s = s_
+        while len(buffer) < MAX_BUFFER_SIZE:
+            done = False
+            # Decay exploration over time
 
-    # XXX can the array be shuffled as long as we store the succ state and current reward?
+            s = env.reset()
 
-    data = np.array(buffer)
+            while not done:
+                a = eps_greedy(s)
+                s_, r, done, _ = env.step(a)
+                buffer.append([s, a, r, s_])
+                s = s_
 
-    # one hot encode states
-    states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
-    succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
-    actions = data[:, 1].astype(np.int)
-    # actions = to_categorical(data[:, 1]).astype(np.float32)
-    rewards = data[:, 2].astype(np.float32)
+        data = np.array(buffer)
 
-    # td_estimate = rewards + gamma * Q.predict(succ_states, actions)
-    td_estimates = Q.predict(states)
+        # one hot encode states
+        states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
+        succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
 
-    for i, (s, a, r, s_) in enumerate(zip(states, actions, rewards, succ_states)):
-        # `Q.predict` returns a (1,A) array
-        td_estimates[i][a] += r + gamma * Q.predict(s_[None, :])[0][a]
+        actions = data[:, 1].astype(np.int)  # actions must be ints so we can use them as indices
+        rewards = data[:, 2].astype(np.float32)
 
-    # td_estimate = rewards + gamma * Q.predict(succ_states, actions)
-    Q.fit(states, td_estimates)
+        td_estimates = Q.predict(states)
+
+        for td_estimate, a, r, s_ in zip(td_estimates, actions, rewards, succ_states):
+            # `Q.predict` returns a (1,A) array, so we use [0] to get the item out
+            td_estimates[a] += r + gamma * Q.predict(s_[None, :])[0][a]
+
+        Q.fit(states, td_estimates)
+
+        # empty replay for next round
+        buffer.clear()
