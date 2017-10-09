@@ -118,12 +118,20 @@ if __name__ == '__main__':
     action_mask = T(to_categorical(actions, num_classes=A))
     td_estimate = rewards + gamma * tf.reduce_sum(action_mask * Q(T(succ_states)), axis=1)
 
+    loss = tf.reduce_mean(keras.losses.mean_squared_error(tf.reduce_max(Q(T(states))), td_estimate))
+
+    train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
+
 # TODO use Q.predict and drop the tensors, and use fancy indexing from numpy
 
-    td_estimate = rewards + gamma * tf.reduce_sum(action_mask * Q(T(succ_states)), axis=1)
+    # td_estimate = rewards + gamma * tf.reduce_sum(action_mask * Q(T(succ_states)), axis=1)
 
-    Q.fit(states, td_estimate)
-
+    # Q.fit(states, td_estimate)
+    # Q.fit(T(states), td_estimate)
+    init = tf.global_variables_initializer()
+    sess.run(init)
+    for _ in range(100):
+        train_step.run()
 # TODO set label of terminal state to just `r` instead of estimate of Q
 
 # TODO make function to get labels for minibatch
