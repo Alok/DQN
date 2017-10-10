@@ -93,7 +93,15 @@ if __name__ == '__main__':
             # `Q.predict` returns a (1,A) array, so we use [0] to get the item out
             td_estimates[a] += r + gamma * Q.predict(s_[None, :])[0][a]
 
-        Q.fit(states, td_estimates)
+        Q.fit(
+            x=states,
+            y=td_estimates,
+            validation_split=0.1,
+            verbose=False,
+        )
 
         # Empty replay buffer for next round of training.
         buffer.clear()
+
+        if args.save:
+            Q.save('model.h5')
