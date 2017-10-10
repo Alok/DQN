@@ -77,13 +77,20 @@ def get_batches(data):
 
     # Actions must be ints so we can use them as indices.
     actions = data[:, 1].astype(np.int)
+
     rewards = data[:, 2].astype(np.float32)
+    terminal = data[:, 4].astype(np.bool)
 
-    td_estimates = target.predict(states)
+    # Use TD_estimates as a baseline
+    td_estimates = target.predict(states, num_classes=S)
 
-    for td_estimate, a, r, s_ in zip(td_estimates, actions, rewards, succ_states):
-        # `Q.predict` returns a (1,A) array, so we use [0] to extract the sub-array.
-        td_estimates[a] += r + gamma * np.max(target.predict(s_[None, :]))
+    for i, (td_estimate, a, r, succ,
+            done) in enumerate(zip(td_estimates, actions, rewards, succ_states, terminal)):
+        if done:
+            td_estimates[i][a] = r
+        else:
+            td_estimates[i][a] = r + gamma * np.max(target.predict(succ))
+
     return states, td_estimates
 
 
