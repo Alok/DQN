@@ -14,8 +14,8 @@ def create_q(S, A):
     state = Input(shape=(S, ))
     x = state
 
-    x = Dense(32, activation='relu')(x)
-    x = Dense(16, activation='relu')(x)
+    x = Dense(64, activation='relu')(x)
+    x = Dense(64, activation='relu')(x)
 
     rewards = Dense(A, activation='linear')(x)
 
