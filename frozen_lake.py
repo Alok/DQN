@@ -18,44 +18,43 @@ from model import create_q
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--save', action='store_true')
-parser.add_argument('--buffer_size', '-b', type=int, default=25_000)
+parser.add_argument('--buffer_size', '-b', type=int, default=1_000_000)
 parser.add_argument('--new', action='store_true')
 parser.add_argument('--iterations', '-n', type=int, default=1_000_000)
-parser.add_argument('--discount', '-d', type=float, default=.999)
-parser.add_argument('--exploration_rate', '-e', type=float, default=.90)
+parser.add_argument('--discount', '-d', type=float, default=.995)
+parser.add_argument('--exploration_rate', '-e', type=float, default=.50)
 args = parser.parse_args()
 
 # TODO  Double DQN
-# TODO  replay buffer
-# TODO  sample minibatches
 # TODO  importance sample minibatches
-# TODO  dueling dqn
-# TODO  expire buffer
-
-# s,a,r,s'
-# a are ints from 0 to
-# TODO set label of terminal state to just `r` instead of estimate of Q
-# TODO make function to get labels for minibatch
-# TODO target network
-# TODO sample buffer in less naive way (currently just wait till it's full and train
+# TODO  Dueling DQN
+# TODO use Embedding layer
 
 env = gym.make('FrozenLake-v0')
 
 S = env.observation_space.n
 A = env.action_space.n
-TERMINAL_STATE = S - 1  # XXX env specific
+TERMINAL_STATE = S - 1  # XXX Env specific.
 
 # Use `deque` because it's efficient to remove the leading elements to expire them.
 
-BATCH_SIZE = 1024
 epsilon = args.exploration_rate
 gamma = args.discount
-BUFFER_SIZE = args.buffer_size
-TRAIN_SIZE = 100 * BATCH_SIZE
+
 ITERS = args.iterations
+RUNNING_REWARDS_ITERS = 100
+
+BATCH_SIZE = 1024
+BUFFER_SIZE = args.buffer_size
+TRAIN_SIZE = 10 * BATCH_SIZE  # train on samples of 10 minibatches
+
+VERBOSE = False
 
 # automatically handles expiring elements
 buffer = deque(maxlen=BUFFER_SIZE)
+
+Q = load_model('model.h5') if not args.new and os.path.exists('model.h5') else create_q(S, A)
+target = load_model('target.h5') if not args.new and os.path.exists('target.h5') else clone_model(Q)
 
 
 def eps_greedy(s: np.int64, epsilon=epsilon):
