@@ -75,8 +75,14 @@ if __name__ == '__main__':
             while not done:
                 a = eps_greedy(s)
                 s_, r, done, _ = env.step(a)
+                running_rew.append(r)
+                if r > 0:
+                    print(i)
                 buffer.append([s, a, r, s_])
                 s = s_
+            avg = np.mean(running_rew)
+            if avg > 0:
+                print(avg)
 
         data = np.array(buffer)
 
