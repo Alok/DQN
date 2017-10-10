@@ -11,7 +11,7 @@ import gym
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from keras.models import load_model
+from keras.models import clone_model, load_model
 from keras.utils.np_utils import to_categorical
 
 from model import create_q
@@ -63,10 +63,11 @@ def eps_greedy(s: np.int64, epsilon=epsilon):
 
 
 if __name__ == '__main__':
-    Q = load_model('model.h5') if not args.new and os.path.exists('model.h5') else create_q(S, A)
+    Q = load_model('target.h5') if not args.new and os.path.exists('target.h5') else create_q(S, A)
+    target = clone_model(Q)
 
     # initial sampling
-    running_rews = []
+    running_rews = []  # XXX env specific
     for i in range(ITERS):
 
         # Decay exploration over time up to a baseline
@@ -103,11 +104,11 @@ if __name__ == '__main__':
             actions = data[:, 1].astype(np.int)
             rewards = data[:, 2].astype(np.float32)
 
-            td_estimates = Q.predict(states)
+            td_estimates = target.predict(states)
 
             for td_estimate, a, r, s_ in zip(td_estimates, actions, rewards, succ_states):
                 # `Q.predict` returns a (1,A) array, so we use [0] to extract the sub-array.
-                td_estimates[a] += r + gamma * Q.predict(s_[None, :])[0][a]
+                td_estimates[a] += r + gamma * np.max(target.predict(s_[None, :])[0])
 
             Q.fit(
                 x=states,
@@ -117,9 +118,11 @@ if __name__ == '__main__':
                 verbose=False,
             )
 
-            # Empty replay buffer for next round of training.
-            buffer.clear()
+        if i % 10_000 and i > 0:
+            # copy Q to update target
+            target = clone_model(Q)
 
-        if i % 5 == 0:
+        if i % 10_000 == 0 and i > 0:
             if args.save:
                 Q.save('model.h5')
+                target.save('target.h5')
