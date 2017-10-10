@@ -17,8 +17,12 @@ from keras.utils.np_utils import to_categorical
 from model import create_q
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--save', '-s', action='store_true')
-parser.add_argument('--new', '-n', action='store_true')
+parser.add_argument('--save', action='store_true')
+parser.add_argument('--buffer_size', '-b', type=int, default=25_000)
+parser.add_argument('--new', action='store_true')
+parser.add_argument('--iterations', '-n', type=int, default=1_000_000)
+parser.add_argument('--discount', '-d', type=float, default=.999)
+parser.add_argument('--exploration_rate', '-e', type=float, default=.90)
 args = parser.parse_args()
 
 # TODO  Double DQN
@@ -41,14 +45,14 @@ S = env.observation_space.n
 A = env.action_space.n
 
 # Use `deque` because it's efficient to remove the leading elements to expire them.
-buffer = deque()
-batch_size = 64
-epsilon = 0.99
-gamma = 0.90
-BUFFER_SIZE = 25000
-ITERS = 1000
 
-sess = tf.InteractiveSession()
+BATCH_SIZE = 1024
+epsilon = args.exploration_rate
+gamma = args.discount
+BUFFER_SIZE = args.buffer_size
+ITERS = args.iterations
+
+buffer = deque()
 
 
 def eps_greedy(s: np.int64, epsilon=epsilon):
@@ -61,53 +65,56 @@ if __name__ == '__main__':
     Q = load_model('model.h5') if not args.new and os.path.exists('model.h5') else create_q(S, A)
 
     # initial sampling
+    running_rews = []
     for i in range(ITERS):
 
-        epsilon *= .99
+        # Decay exploration over time up to a baseline
+        epsilon = max(.05, .99 * epsilon)
 
-        while len(buffer) < BUFFER_SIZE:
-            done = False
-            running_rew = []
-            # Decay exploration over time
+        done = False
 
-            s = env.reset()
+        s = env.reset()
 
-            while not done:
-                a = eps_greedy(s)
-                s_, r, done, _ = env.step(a)
-                running_rew.append(r)
-                if r > 0:
-                    print(i)
-                buffer.append([s, a, r, s_])
-                s = s_
-            avg = np.mean(running_rew)
-            if avg > 0:
-                print(avg)
+        while not done:
+            a = eps_greedy(s)
+            s_, r, done, _ = env.step(a)
+            buffer.append([s, a, r, s_])
+            s = s_
 
-        data = np.array(buffer)
+        # get last reward as score for whole episode to see OpenAI score
+        running_rews.append(r)
+        if i % 10_000 == 0 and i > 0:
+            print(np.mean(running_rews))
+            running_rews.clear()
 
-        # One-hot encode states.
-        states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
-        succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
+        if len(buffer) >= BUFFER_SIZE:
+            data = np.array(buffer)
 
-        actions = data[:, 1].astype(np.int)  # actions must be ints so we can use them as indices
-        rewards = data[:, 2].astype(np.float32)
+            # One-hot encode states.
+            states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
+            succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
 
-        td_estimates = Q.predict(states)
+            # Actions must be ints so we can use them as indices.
+            actions = data[:, 1].astype(np.int)
+            rewards = data[:, 2].astype(np.float32)
 
-        for td_estimate, a, r, s_ in zip(td_estimates, actions, rewards, succ_states):
-            # `Q.predict` returns a (1,A) array, so we use [0] to get the item out
-            td_estimates[a] += r + gamma * Q.predict(s_[None, :])[0][a]
+            td_estimates = Q.predict(states)
 
-        Q.fit(
-            x=states,
-            y=td_estimates,
-            validation_split=0.1,
-            verbose=False,
-        )
+            for td_estimate, a, r, s_ in zip(td_estimates, actions, rewards, succ_states):
+                # `Q.predict` returns a (1,A) array, so we use [0] to extract the sub-array.
+                td_estimates[a] += r + gamma * Q.predict(s_[None, :])[0][a]
 
-        # Empty replay buffer for next round of training.
-        buffer.clear()
+            Q.fit(
+                x=states,
+                y=td_estimates,
+                batch_size=BATCH_SIZE,
+                validation_split=0.1,
+                verbose=False,
+            )
 
-        if args.save:
-            Q.save('model.h5')
+            # Empty replay buffer for next round of training.
+            buffer.clear()
+
+        if i % 5 == 0:
+            if args.save:
+                Q.save('model.h5')
