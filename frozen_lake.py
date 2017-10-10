@@ -102,14 +102,11 @@ if __name__ == '__main__':
 
         while not done:
             a = eps_greedy(s)
-            s_, r, done, _ = env.step(a)
-            buffer.append([s, a, r, s_])
-            s = s_
+            succ, r, done, _ = env.step(a)
+            buffer.append([s, a, r, succ, done])
+            s = succ
 
         # All terminal states have 0 reward and loop back to themselves as a successor state for all actions.
-        # XXX Env specific.
-        for a in range(A):
-            buffer.append([TERMINAL_STATE, a, 0, TERMINAL_STATE])
 
         # XXX Env specific.
         # Get last reward as score for whole episode to calculate OpenAI score.
