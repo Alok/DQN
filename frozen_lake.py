@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from keras.models import clone_model, load_model
+from keras.optimizers import Adam
 from keras.utils.np_utils import to_categorical
 
 from model import create_q
@@ -46,7 +47,7 @@ RUNNING_REWARDS_ITERS = 1_000
 
 BATCH_SIZE = 1024
 BUFFER_SIZE = args.buffer_size
-TRAIN_SIZE = 20 * BATCH_SIZE  # train on samples of 10 minibatches
+TRAIN_SIZE = 10 * BATCH_SIZE  # train on samples of 10 minibatches
 
 VERBOSE = False
 
@@ -55,6 +56,12 @@ buffer = deque(maxlen=BUFFER_SIZE)
 
 Q = load_model('model.h5') if not args.new and os.path.exists('model.h5') else create_q(S, A)
 target = load_model('target.h5') if not args.new and os.path.exists('target.h5') else clone_model(Q)
+
+target.compile(
+    optimizer=Adam(),
+    loss='mse',
+    metrics=['acc'],
+)
 
 
 def eps_greedy(s: np.int64, epsilon=epsilon):
