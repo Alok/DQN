@@ -11,9 +11,15 @@ import gym
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from keras.models import load_model
 from keras.utils.np_utils import to_categorical
 
 from model import create_q
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--save', '-s', action='store_true')
+parser.add_argument('--new', '-n', action='store_true')
+args = parser.parse_args()
 
 # TODO  Double DQN
 # TODO  replay buffer
