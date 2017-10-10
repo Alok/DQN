@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
         # Takes about 5000 iterations to gather enough data.
         # TODO change to 5000 after debugging over
-        if i % 1_000 == 0 and len(buffer) >= TRAIN_SIZE:
+        if i % 500 == 0 and len(buffer) >= TRAIN_SIZE:
 
             buffer_sample = random.sample(buffer, k=TRAIN_SIZE)
             data = np.array(buffer_sample)
