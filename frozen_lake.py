@@ -39,7 +39,7 @@ buffer = deque()
 batch_size = 64
 epsilon = 0.99
 gamma = 0.99
-MAX_BUFFER_SIZE = 1_000_000
+MAX_BUFFER_SIZE = 10_000
 ITERS = 100
 
 sess = tf.InteractiveSession()
@@ -47,7 +47,8 @@ sess = tf.InteractiveSession()
 
 def eps_greedy(s: np.int64, epsilon=epsilon):
     # `np.argmax` works along flattened array, so for an nested array with a single entry, we get the right answer.
-    return np.argmax(Q.predict(to_categorical(s,S))) if random.random() > epsilon else env.action_space.sample()
+    return np.argmax(Q.predict(to_categorical(s, S))
+                     ) if random.random() > epsilon else env.action_space.sample()
 
 
 if __name__ == '__main__':
@@ -72,7 +73,7 @@ if __name__ == '__main__':
 
         data = np.array(buffer)
 
-        # one hot encode states
+        # One-hot encode states.
         states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
         succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
 
@@ -87,5 +88,5 @@ if __name__ == '__main__':
 
         Q.fit(states, td_estimates)
 
-        # empty replay for next round
+        # Empty replay buffer for next round of training.
         buffer.clear()
