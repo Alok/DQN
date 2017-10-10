@@ -44,9 +44,9 @@ A = env.action_space.n
 buffer = deque()
 batch_size = 64
 epsilon = 0.99
-gamma = 0.99
-MAX_BUFFER_SIZE = 10_000
-ITERS = 100
+gamma = 0.90
+BUFFER_SIZE = 25000
+ITERS = 1000
 
 sess = tf.InteractiveSession()
 
