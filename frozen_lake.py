@@ -43,6 +43,7 @@ env = gym.make('FrozenLake-v0')
 
 S = env.observation_space.n
 A = env.action_space.n
+TERMINAL_STATE = S - 1
 
 # Use `deque` because it's efficient to remove the leading elements to expire them.
 
@@ -80,6 +81,10 @@ if __name__ == '__main__':
             s_, r, done, _ = env.step(a)
             buffer.append([s, a, r, s_])
             s = s_
+
+        # All terminal states have 0 reward and themselves as a successor state for all actions.
+        for a in range(A):
+            buffer.append([TERMINAL_STATE, a, 0, TERMINAL_STATE])
 
         # get last reward as score for whole episode to see OpenAI score
         running_rews.append(r)
