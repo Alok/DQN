@@ -43,7 +43,7 @@ env = gym.make('FrozenLake-v0')
 
 S = env.observation_space.n
 A = env.action_space.n
-TERMINAL_STATE = S - 1
+TERMINAL_STATE = S - 1  # XXX env specific
 
 # Use `deque` because it's efficient to remove the leading elements to expire them.
 
@@ -51,9 +51,11 @@ BATCH_SIZE = 1024
 epsilon = args.exploration_rate
 gamma = args.discount
 BUFFER_SIZE = args.buffer_size
+TRAIN_SIZE = 100 * BATCH_SIZE
 ITERS = args.iterations
 
-buffer = deque()
+# automatically handles expiring elements
+buffer = deque(maxlen=BUFFER_SIZE)
 
 
 def eps_greedy(s: np.int64, epsilon=epsilon):
@@ -84,17 +86,23 @@ if __name__ == '__main__':
             s = s_
 
         # All terminal states have 0 reward and themselves as a successor state for all actions.
+        # XXX env specific
         for a in range(A):
             buffer.append([TERMINAL_STATE, a, 0, TERMINAL_STATE])
 
+        # XXX env specific
         # get last reward as score for whole episode to see OpenAI score
         running_rews.append(r)
-        if i % 10_000 == 0 and i > 0:
-            print(np.mean(running_rews))
+
+        # XXX env specific
+        if i % 1_000 == 0:
+            successes = sum(1 for r in running_rews if r > 0)
+            print(f'Score: {successes}/1000')
             running_rews.clear()
 
-        if len(buffer) >= BUFFER_SIZE:
-            data = np.array(buffer)
+        if i % 1000 == 0 and len(buffer) >= BUFFER_SIZE:
+            # sample from buffer
+            data = np.array(random.sample(buffer, k=TRAIN_SIZE))
 
             # One-hot encode states.
             states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
