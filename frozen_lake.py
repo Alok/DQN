@@ -23,8 +23,8 @@ parser.add_argument('--save', action='store_true')
 parser.add_argument('--buffer_size', '-b', type=int, default=1_000_000)
 parser.add_argument('--new', action='store_true')
 parser.add_argument('--iterations', '-n', type=int, default=1_000_000)
-parser.add_argument('--discount', '-d', type=float, default=.995)
-parser.add_argument('--exploration_rate', '-e', type=float, default=.50)
+parser.add_argument('--discount', '-d', type=float, default=0.995)
+parser.add_argument('--exploration_rate', '-e', type=float, default=0.50)
 args = parser.parse_args()
 
 # TODO  Double DQN
@@ -102,7 +102,11 @@ if __name__ == '__main__':
     for i in range(ITERS):
 
         # Decay exploration over time up to a baseline
-        epsilon = max(.05, .99 * epsilon)
+        if i < 10_000 and i % 1_000 == 0:
+            # explore 10x as much in the beginning
+            epsilon = max(0.50, 0.99 * epsilon)
+        else:
+            epsilon = max(0.05, 0.99 * epsilon)
 
         done = False
 
