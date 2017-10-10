@@ -58,15 +58,16 @@ def eps_greedy(s: np.int64, epsilon=epsilon):
 
 
 if __name__ == '__main__':
-    Q = create_q(S, A)
+    Q = load_model('model.h5') if not args.new and os.path.exists('model.h5') else create_q(S, A)
 
     # initial sampling
     for i in range(ITERS):
 
         epsilon *= .99
 
-        while len(buffer) < MAX_BUFFER_SIZE:
+        while len(buffer) < BUFFER_SIZE:
             done = False
+            running_rew = []
             # Decay exploration over time
 
             s = env.reset()
