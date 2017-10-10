@@ -12,21 +12,14 @@ from keras.optimizers import Adam
 
 def create_q(S, A):
     state = Input(shape=(S, ))
-    # action = Input(shape=(A, ))
-    #
-    # x = concatenate([state, action])
     x = state
 
+    x = Dense(32, activation='relu')(x)
     x = Dense(16, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dense(16, activation='relu')(x)
-    x = BatchNormalization()(x)
 
-    rewards = Dense(A)(x)
-    # rewards = Dense(1)(x)
+    rewards = Dense(A, activation='linear')(x)
 
     model = Model(inputs=state, outputs=rewards)
-    # model = Model(inputs=[state, action], outputs=rewards)
 
     model.compile(
         optimizer=Adam(),
