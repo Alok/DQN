@@ -140,3 +140,6 @@ if __name__ == '__main__':
 
             Q.save('model.h5')
             target.save('target.h5')
+            # In case I end up stopping the program, at least one model will be saved.
+            Q.save('model.h5.bak')
+            target.save('target.h5.bak')
