@@ -63,12 +63,27 @@ def eps_greedy(s: np.int64, epsilon=epsilon):
                      ) if random.random() > epsilon else env.action_space.sample()
 
 
-if __name__ == '__main__':
-    Q = load_model('target.h5') if not args.new and os.path.exists('target.h5') else create_q(S, A)
-    target = clone_model(Q)
+def get_batches(data):
+    # One-hot encode states.
+    states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
+    succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
 
-    # initial sampling
-    running_rews = []  # XXX env specific
+    # Actions must be ints so we can use them as indices.
+    actions = data[:, 1].astype(np.int)
+    rewards = data[:, 2].astype(np.float32)
+
+    td_estimates = target.predict(states)
+
+    for td_estimate, a, r, s_ in zip(td_estimates, actions, rewards, succ_states):
+        # `Q.predict` returns a (1,A) array, so we use [0] to extract the sub-array.
+        td_estimates[a] += r + gamma * np.max(target.predict(s_[None, :]))
+    return states, td_estimates
+
+
+if __name__ == '__main__':
+
+    running_rews = []  # XXX Env specific.
+
     for i in range(ITERS):
 
         # Decay exploration over time up to a baseline
@@ -84,52 +99,41 @@ if __name__ == '__main__':
             buffer.append([s, a, r, s_])
             s = s_
 
-        # All terminal states have 0 reward and themselves as a successor state for all actions.
-        # XXX env specific
+        # All terminal states have 0 reward and loop back to themselves as a successor state for all actions.
+        # XXX Env specific.
         for a in range(A):
             buffer.append([TERMINAL_STATE, a, 0, TERMINAL_STATE])
 
-        # XXX env specific
-        # get last reward as score for whole episode to see OpenAI score
+        # XXX Env specific.
+        # Get last reward as score for whole episode to calculate OpenAI score.
         running_rews.append(r)
 
-        # XXX env specific
-        if i % 1_000 == 0:
-            successes = sum(1 for r in running_rews if r > 0)
-            print(f'Score: {successes}/1000')
+        # XXX Env specific.
+        if i % RUNNING_REWARDS_ITERS == 0:
+            num_successes = sum(1 for r in running_rews if r > 0)
+            print(f'Score: {num_successes}/{RUNNING_REWARDS_ITERS}')
             running_rews.clear()
 
-        if i % 1000 == 0 and len(buffer) >= BUFFER_SIZE:
-            # sample from buffer
+        # Takes about 5000 iterations to gather enough data.
+        if i % 1_000 == 0 and len(buffer) >= TRAIN_SIZE:
+            # Sample from buffer.
             data = np.array(random.sample(buffer, k=TRAIN_SIZE))
 
-            # One-hot encode states.
-            states = to_categorical(data[:, 0], num_classes=S).astype(np.float32)
-            succ_states = to_categorical(data[:, 3], num_classes=S).astype(np.float32)
-
-            # Actions must be ints so we can use them as indices.
-            actions = data[:, 1].astype(np.int)
-            rewards = data[:, 2].astype(np.float32)
-
-            td_estimates = target.predict(states)
-
-            for td_estimate, a, r, s_ in zip(td_estimates, actions, rewards, succ_states):
-                # `Q.predict` returns a (1,A) array, so we use [0] to extract the sub-array.
-                td_estimates[a] += r + gamma * np.max(target.predict(s_[None, :])[0])
+            states, td_estimates = get_batches(data)
 
             Q.fit(
                 x=states,
                 y=td_estimates,
                 batch_size=BATCH_SIZE,
                 validation_split=0.1,
-                verbose=False,
+                verbose=VERBOSE,
             )
 
-        if i % 10_000 and i > 0:
+        if i % 5_000 == 0 and i > 0:
             # copy Q to update target
             target = clone_model(Q)
 
-        if i % 10_000 == 0 and i > 0:
-            if args.save:
-                Q.save('model.h5')
-                target.save('target.h5')
+        if args.save and i % 10_000 == 0 and i > 0:
+
+            Q.save('model.h5')
+            target.save('target.h5')
