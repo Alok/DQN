@@ -83,14 +83,15 @@ def get_batches(data):
     terminal = data[:, 4].astype(np.bool)
 
     # Use TD_estimates as a baseline
-    td_estimates = target.predict(states, num_classes=S)
+    td_estimates = target.predict(states)
+    succ_preds = target.predict(succ_states)
 
     for i, (td_estimate, a, r, succ,
             done) in enumerate(zip(td_estimates, actions, rewards, succ_states, terminal)):
         if done:
             td_estimates[i][a] = r
         else:
-            td_estimates[i][a] = r + gamma * np.max(target.predict(succ))
+            td_estimates[i][a] = r + gamma * np.max(succ_preds[i])
 
     return states, td_estimates
 
