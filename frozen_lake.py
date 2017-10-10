@@ -106,22 +106,21 @@ if __name__ == '__main__':
             buffer.append([s, a, r, succ, done])
             s = succ
 
-        # All terminal states have 0 reward and loop back to themselves as a successor state for all actions.
-
         # XXX Env specific.
         # Get last reward as score for whole episode to calculate OpenAI score.
         running_rews.append(r)
 
-        # XXX Env specific.
         if i % RUNNING_REWARDS_ITERS == 0:
             num_successes = sum(1 for r in running_rews if r > 0)
-            print(f'Score: {np.mean(running_rews)}')
+            print(f'i:{i} || Score: {100 * np.mean(running_rews)}%')
             running_rews.clear()
 
         # Takes about 5000 iterations to gather enough data.
+        # TODO change to 5000 after debugging over
         if i % 1_000 == 0 and len(buffer) >= TRAIN_SIZE:
-            # Sample from buffer.
-            data = np.array(random.sample(buffer, k=TRAIN_SIZE))
+
+            buffer_sample = random.sample(buffer, k=TRAIN_SIZE)
+            data = np.array(buffer_sample)
 
             states, td_estimates = get_batches(data)
 
