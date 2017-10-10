@@ -42,11 +42,11 @@ epsilon = args.exploration_rate
 gamma = args.discount
 
 ITERS = args.iterations
-RUNNING_REWARDS_ITERS = 100
+RUNNING_REWARDS_ITERS = 1_000
 
 BATCH_SIZE = 1024
 BUFFER_SIZE = args.buffer_size
-TRAIN_SIZE = 10 * BATCH_SIZE  # train on samples of 10 minibatches
+TRAIN_SIZE = 20 * BATCH_SIZE  # train on samples of 10 minibatches
 
 VERBOSE = False
 
@@ -111,7 +111,7 @@ if __name__ == '__main__':
         # XXX Env specific.
         if i % RUNNING_REWARDS_ITERS == 0:
             num_successes = sum(1 for r in running_rews if r > 0)
-            print(f'Score: {num_successes}/{RUNNING_REWARDS_ITERS}')
+            print(f'Score: {np.mean(running_rews)}')
             running_rews.clear()
 
         # Takes about 5000 iterations to gather enough data.
